@@ -3,17 +3,11 @@
 
 using Catalyst
 using DifferentialEquations
-using Plots
-using Zygote
-using SciMLSensitivity
-using Optimization
-using OptimizationOptimisers
-#using ForwardDiff
 
 # fc = fully connected
 # rt = ring topology
 
-function get_fc_species_list(n::UInt8)::Vector{Vector{String}}
+function get_fc_species_list(n::Int64)::Vector{Vector{String}}
     """
     Given integer `n`, return a length-sorted Vector{Vector{String}} object in which
     Vector{String} objects are all ways of listing a non-empty subset of the `n` 
@@ -131,7 +125,7 @@ function get_rate_constants_from_k_ons(k_ons::Vector,
     return rates
 end
 
-function get_fc_rn(n::UInt8)::ReactionSystem
+function get_fc_rn(n::Int64)::ReactionSystem
     """
     Given integer `n`, return a ReactionSystem object representing a fully connected
     rate growth chemical reaction network.
@@ -148,84 +142,3 @@ function get_fc_rn(n::UInt8)::ReactionSystem
     @named rn = ReactionSystem(rxs, t)
     return rn
 end
-
-function sample_rn(rn::ReactionSystem,
-                   topology::String;
-                   k_ons::Vector=[10., 10.], 
-                   t_start::Float64=1e-4,
-                   t_end::Float64=1e4,
-                   noise::Float64=0.1)::Tuple{Float64, Vector{Float64}, Array{Float64, 2}, ODEProblem}
-    # Start with concentration 1 for all monomers, whose names have 5 characters,
-    # e.g. "X1(t)"
-    u0 = [length(string(species)) == 5 for species in species(rn)]
-    # The time span should start from a small, but non-zero time in order to avoid 
-    # taking the log of zero.
-    tspan = (t_start, t_end)
-    # Obtain a log10-spaced vector of times at which to sample the ODE solution.
-    # The log10-scale enables us to observe trapping at early simulation times.
-    sample_times = 10 .^ range(log10(tspan[1]), log10(tspan[2]), length=100)
-
-    params = get_rate_constants_from_k_ons(k_ons, topology)
-    prob = ODEProblem(rn, u0, tspan, params)
-    sol_real = solve(prob, Tsit5(); tstops = sample_times)
-    sample_vals = Array(sol_real(sample_times))
-
-    # Add noise to the ODE solution by uniformly sampling a coefficient for the
-    # observed value at each time step from the interval [1-`noise`/2, 1+`noise`/2].
-    sample_vals .*= (1 .+ noise * rand(Float64, size(sample_vals)) .- (noise / 2))
-
-    return t_end, sample_times, sample_vals, prob
-end
-
-function optimise_p(p_init::Vector{Float64}, 
-                    topology::String,
-                    t_end::Float64, 
-                    sample_times::Vector{Float64}, 
-                    sample_vals::Array{Float64, 2}, 
-                    prob::ODEProblem)::Vector{Float64}
-    """
-    `topology` should be "fc" for fully connected topology or "rg" for ring topology
-    """
-    function loss(p, _)
-        newtimes = filter(<=(t_end), sample_times)
-        params = get_rate_constants_from_k_ons(p, topology)
-        newprob = remake(prob; tspan=(1e-4, t_end), p=params)
-        sol = Array(solve(newprob, TRBDF2(); saveat = newtimes))
-        loss = sum(abs2, sol[:, 7] .- sample_vals[:, 7])
-        return loss, sol
-    end
-
-    # optimize for the parameters that minimize the loss
-    optf = OptimizationFunction(loss, Optimization.AutoZygote())
-    optprob = OptimizationProblem(optf, p_init)
-    sol = solve(optprob, OptimizationOptimisers.ADAM(10); maxiters = 1000)
-
-    # Return the parameter estimates
-    return sol.u
-end
-
-# Load reaction network and get sample to be fit to
-rn = get_fc_rn(3)
-t_end, sample_times, sample_vals, prob = sample_rn(rn, "fc", k_ons=[100, 100], noise=0.)
-scatter(log10.(sample_times), sample_vals[7, :])
-
-# Estimate parameters up to `t_end_est`
-t_end_est = 1e0
-p_init = [10.0, 100.0]
-estimate_sol = optimise_p(p_init, "fc", t_end_est, sample_times, sample_vals, prob)     
-
-# Plot the sample and the estimate
-scatter(log10.(sample_times), sample_vals[7, :])
-_, samples_times_est, sample_vals_est, _ = 
-    sample_fc_rn(rn, [estimate_sol[1], 1e-4, estimate_sol[2], 1e-4], t_end_est, 0.0)
-plot!(log10.(samples_times_est), sample_vals_est[7, :], lw=4)
-
-# Things to test:
-# - Different ODE solvers 
-#   - Hypothesis: No significant effect
-# - FowardDiff vs. Zygote (reverse-mode) vs. NM (numerical black-box) vs. 
-#   gradient descent (numerical first-order) vs. BFGS (numerical second-order)
-#   - Hypothesis: Zygote is fastest, but ForwardDiff avoids memory issues at high `n`
-# - Different `n` values, e.g. {3, 4, 5, 10}
-# - Fully connected vs. ring topologies
-# - Optimization using observations of different species
