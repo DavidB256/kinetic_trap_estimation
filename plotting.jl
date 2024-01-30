@@ -207,45 +207,51 @@ end
 rn = get_fc_rn(3)
 
 l = @layout [a b; c d]
-gr(legendfontsize=5)
-linesize=3
-dotsize=4
+gr(legendfontsize=10)
+linesize=4
+dotsize=7
 
-xlims = (-4.5, 5.5)
+xlims_set = (-4.5, 5.5)
 sample_times, sample_vals, _ = 
     sample_rn(rn, "fc", [100, 100], (1e-4, 1e5), noise=0., num_samples=100)
 p1 = plot(log10.(sample_times), sample_vals[1, :], lw=linesize, label="Monomer",
-          xlimits=xlims, dpi=1000)
+          xlimits=xlims_set, dpi=1000)
 plot!(log10.(sample_times), sample_vals[3, :], lw=linesize, label="Dimer")
 plot!(log10.(sample_times), sample_vals[7, :], lw=linesize, label="Trimer")
-plot!(xlabel="log10(t)", ylabel="Relative yield")
+plot!(xlabel="log10(t) (a.u.)", ylabel="Relative yield")
 savefig("figs/trimer_fig_pt1.png")
 
 sample_times, sample_vals, _ = 
     sample_rn(rn, "fc", [100, 100], (1e-4, 1e5), noise=0., num_samples=10)
-p2 = scatter(log10.(sample_times), sample_vals[1, :], lw=4, label="Monomer",
-             xlimits=xlims, dpi=1000, ms=dotsize)
-scatter!(log10.(sample_times), sample_vals[3, :], lw=4, label="Dimer", ms=dotsize)
-scatter!(log10.(sample_times), sample_vals[7, :], lw=4, label="Trimer", ms=dotsize)
-plot!(xlabel="log10(t)", ylabel="Relative yield")
+# p2 = scatter(log10.(sample_times), sample_vals[1, :], label="Monomer",
+#              xlimits=xlims_set, dpi=1000, ms=dotsize)
+# scatter!(log10.(sample_times), sample_vals[3, :], label="Dimer", ms=dotsize)
+# scatter!(log10.(sample_times), sample_vals[7, :], label="Trimer", ms=dotsize)
+p2 = scatter(log10.(sample_times), sample_vals[7, :], label="Trimer",
+             xlimits=xlims_set, dpi=1000, ms=dotsize, color=3)
+plot!(xlabel="log10(t) (a.u.)", ylabel="Relative yield")
 savefig("figs/trimer_fig_pt2.png")
 
 sample_times, sample_vals, _ = 
     sample_rn(rn, "fc", [100, 100], (1e-4, 1e5), noise=0.2, num_samples=10)
-p3 = scatter(log10.(sample_times), sample_vals[1, :], lw=4, label="Monomer",
-             xlimits=xlims, dpi=1000, ms=dotsize)
-scatter!(log10.(sample_times), sample_vals[3, :], lw=4, label="Dimer", ms=dotsize)
-scatter!(log10.(sample_times), sample_vals[7, :], lw=4, label="Trimer", ms=dotsize)
-plot!(xlabel="log10(t)", ylabel="Relative yield")
+# p3 = scatter(log10.(sample_times), sample_vals[1, :], label="Monomer",
+#              xlimits=xlims_set, dpi=1000, ms=dotsize)
+# scatter!(log10.(sample_times), sample_vals[3, :], label="Dimer", ms=dotsize)
+# scatter!(log10.(sample_times), sample_vals[7, :], label="Trimer", ms=dotsize)
+p3 = scatter(log10.(sample_times), sample_vals[7, :], label="Trimer",
+             xlimits=xlims_set, dpi=1000, ms=dotsize, color=3)
+plot!(xlabel="log10(t) (a.u.)", ylabel="Relative yield")
 savefig("figs/trimer_fig_pt3.png")
 
-p4 = plot([-0.4, 5], [0., 0.], lw=linesize, label="Monomer",
-          xlimits=xlims, dpi=1000)
-plot!([-0.375, 0.75], [0.2, 0.2], lw=linesize, label="Dimer")
-plot!([3, 5], [0., 0.], lw=4, label=:false, color=2)
-plot!([-0.4, 1], [0.7, 0.7], lw=linesize, label="Trimer", color=3)
-plot!([3, 5], [1., 1.], lw=linesize, label=:false, color=3)
-plot!(xlabel="log10(t)", ylabel="Relative yield")
+# p4 = plot([-0.4, 5], [0., 0.], lw=linesize, label="Monomer",
+#           xlimits=xlims_set, dpi=1000)
+# plot!([-0.375, 0.75], [0.2, 0.2], lw=linesize, label="Dimer")
+# plot!([3, 5], [0., 0.], lw=4, label=:false, color=2)
+# plot!([-0.4, 1], [0.7, 0.7], lw=linesize, label="Trimer", color=3)
+# plot!([3, 5], [1., 1.], lw=linesize, label=:false, color=3)
+p4 = plot([-0.45, 1.05], [0.7, 0.7], lw=linesize, label="Trimer", color=3,
+          xlimits=xlims_set, dpi=1000, ylimits=(0., 1.))
+plot!(xlabel="log10(t) (a.u.)", ylabel="Relative yield")
 savefig("figs/trimer_fig_pt4.png")
 
 plot(p1, p2, p3, p4, layout=l)

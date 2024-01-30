@@ -53,11 +53,13 @@ function convert_vec_to_string(vec::Vector{String})::String
     return "[" * join(vec, ", ") * "]"
 end
 
+"""
+    get_fc_rxs_eval_string(species_list)
+
+Given a Vector{Vector{String}} `species_list`, return a String to be evaluated
+as code that lists all reactions in a fully connected reaction network topology.
+"""
 function get_fc_rxs_eval_string(species_list::Vector{Vector{String}})::String
-    """
-    Given a Vector{Vector{String}} `species_list`, return a String to be evaluated
-    as code that lists all reactions in a fully connected reaction network topology.
-    """
     # In the fully connected topology, the number of species is 2 ^ n - 1.
     num_monomers = Int(log2(length(species_list) + 1))
     # Remove the end product from species_list
@@ -104,7 +106,7 @@ end
 function get_rate_constants_from_k_ons(k_ons::Vector,
                                        topology::String;
                                        delta_G_kb_T::Float64=-20., 
-                                       C0::Float64=1e4)::Vector{Float64}
+                                       C0::Float64=1e4)
     """
     Given binding reaction rates `k_ons`, return a Vector of alternating k_on and
     corresponding k_off values, according to eq. 2 in the preprint.
