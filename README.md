@@ -5,20 +5,20 @@ Rotation project of David Bass in Margaret Johnson lab, Nov. 2023--Jan. 2024. Ba
 I wrote a Julia framework for constructing ODE models of fully connected rate-growth chemical reaction networks of arbitrary size.
 - Generalizing this framework to have other topologies or to make different sets of assumptions would be non-trivial, but not difficult.
 
-I wrote a Julia framework for estimating the rate constants that parameterize a chemical reaction network from two types of experimental data: (1) observations of the concentration of the end product at time points uniformly spaced in log10-time and (2) the time spans and concentrations at which the end product is kinetically trapped, as defined by its finite difference being instantaneously lower than a given threshold. 
+I wrote a Julia framework for estimating the rate constants that parameterize a chemical reaction network from two types of experimental data: __(1)__ observations of the concentration of the end product at time points uniformly spaced in log10-time and __(2)__ the time spans and concentrations at which the end product is kinetically trapped, as defined by its finite difference being instantaneously lower than a given threshold. 
 - This framework needs a moderate amount of refactoring and documentation to be reproducible.
 - Substituting the loss (aka objective) function, e.g. to change the type of experimental data accepted or to optimize to an internal goal (e.g. optimal yield within a given time frame, regardless of experimental data), is easy.
 
 I wrote a benchmarking wrapper for a routine that randomly samples true rate constants from whithin a narrow range, simulates experimental data, and then times repeated attempts at  simulates rate constant estimation.
 - The tool that I used, Benchmark.jl, is unnecessarily difficult to work with, especially with respect to I/O, so I might want to replace it with home-brewed timing and logging tools.
 
-In my benchmarking routine, for $n \in \{3, 4, 5\}$, I showed that forward-mode automatic differentiation runs significantly faster than reverse-mode automatic differentiation with no significant loss in accuracy, and optimizing on kinetic trapping information instead of sampled concentration time series data yields significantly lower accuracy, but with no significant difference in runtime. The main conclusions are that (1) automatic differentiation, especially forward-mode automatic differentiation when optimizing $\le 5$ rate constants, efficiently solves the optimization problem and (2) minimal experimental information about kinetic trapping conveys significant amounts of information about rate constants that can be extracted via suprisingly simple optimization routines.
+In my benchmarking routine, for $n \in \{3, 4, 5\}$, I showed that forward-mode automatic differentiation runs significantly faster than reverse-mode automatic differentiation with no significant loss in accuracy, and optimizing on kinetic trapping information instead of sampled concentration time series data yields significantly lower accuracy, but with no significant difference in runtime. The main conclusions are that __(1)__ automatic differentiation, especially forward-mode automatic differentiation when optimizing $\le 5$ rate constants, efficiently solves the optimization problem and __(2)__ minimal experimental information about kinetic trapping conveys significant amounts of information about rate constants that can be extracted via suprisingly simple optimization routines.
 
 I created vectorized illustrations of kinetic trapping (toy example of microtubule assembly) and fully connected heterotrimer assembly (see `rotation_talk.pdf`).
 
 ### Potential next steps for integrating my work
 - Document my code more thoroughly.
-- Re-implement more of the Kinetic_AssemblyAD repository in Julia.
+- Re-implement more of the Kinetic_AssemblyAD repository in Julia in order to benchmark Julia against the PyTorch implementation.
 - Perform more trials of benchmarking, with memory records in addition to timing and accuracy records.
 - Write up more formal statistical analysis of benchmarking results.
 
