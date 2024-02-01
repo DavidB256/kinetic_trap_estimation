@@ -1,19 +1,24 @@
-# Code for Julia pkg command line environment setup:
-# add Catalyst DifferentialEquations Plots Zygote SciMLSensitivity Optimization OptimizationOptimisers ForwardDiff
-
 using Catalyst
 using DifferentialEquations
+
+"""
+This file contains functions needed for the construction of fully connected hetero-n-mer
+reaction networks as objects of the ReactionSystem type provided by Catalyst.jl.
+It makes heavy use of meta-programming.
+"""
 
 # fc = fully connected
 # rt = ring topology
 
+"""
+    get_fc_species_list(n)
+
+Given integer `n`, return a length-sorted Vector{Vector{String}} object in which
+Vector{String} objects are all ways of listing a non-empty subset of the `n` 
+monomers in a fully connected reaction network topology, up to permutation.
+Each monomer is represented by a string of the form `Xi`.
+"""
 function get_fc_species_list(n::Int64)::Vector{Vector{String}}
-    """
-    Given integer `n`, return a length-sorted Vector{Vector{String}} object in which
-    Vector{String} objects are all ways of listing a non-empty subset of the `n` 
-    monomers in a fully connected reaction network topology, up to permutation.
-    Each monomer is represented by a string of the form `Xi`.
-    """
     monomers = ["X$i" for i in 1:n]
     species_list = []
 
@@ -30,12 +35,14 @@ function get_fc_species_list(n::Int64)::Vector{Vector{String}}
     return species_list
 end
 
+"""
+    get_species_string(species_list)
+
+Given Vector{Vector{String}} `species_list`, return a String to be evaluated
+as code that lists all species as functions of time for Catalyst.jl's `@species`
+macro. 
+"""
 function get_species_string(species_list::Vector{Vector{String}})::String
-    """
-    Given Vector{Vector{String}} `species_list`, return a String to be evaluated
-    as code that lists all species as functions of time for Catalyst.jl's `@species`
-    macro. 
-    """
     # Convert Vector{String} objects that represent species into Strings
     species_string_list = [join(species) for species in species_list]
     # Prepend macros
@@ -45,11 +52,13 @@ function get_species_string(species_list::Vector{Vector{String}})::String
     return eval_string_line1 * eval_string_line2
 end
 
+"""
+    convert_vec_to_string(vec)
+
+Given a Vector object `vec`, return a String representation of it. E.g., given
+a vector containing "X1" and "X2", return String "[X1, X2]".
+"""
 function convert_vec_to_string(vec::Vector{String})::String
-    """
-    Given a Vector object `vec`, return a String representation of it. E.g. given
-    a vector containing "X1" and "X2", return String "[X1, X2]".
-    """
     return "[" * join(vec, ", ") * "]"
 end
 
@@ -103,23 +112,30 @@ function get_fc_rxs_eval_string(species_list::Vector{Vector{String}})::String
     return eval_string_line1 * eval_string_line2
 end
 
+"""
+    get_rate_constants_from_k_ons(k_ons, topology[, delta_G_kb_T, C0])
+
+Given binding reaction rates `k_ons`, return a Vector of alternating k_on and
+corresponding k_off values, according to eq. 2 in Jhaveri and Loggia et al.'s preprint.
+Note that this default value of C0=1e4 is two orders of magnitude smaller than that
+used in the preprint. This change was made in order to promote kinetic trapping
+at certain desired times and rate constants that made for neat numbers, and has
+no physical significance. 
+"""
 function get_rate_constants_from_k_ons(k_ons::Vector,
                                        topology::String;
                                        delta_G_kb_T::Float64=-20., 
-                                       C0::Float64=1e4)
-    """
-    Given binding reaction rates `k_ons`, return a Vector of alternating k_on and
-    corresponding k_off values, according to eq. 2 in the preprint.
-    """
+                                       C0::Float64=1e4)::Vector{Float64}
     rates = []
     for (i, k_on) in enumerate(k_ons)
-        if topology == "fc"
+        if topology in ["fully_connected", "fc"]
             m = i
-        elseif topology == "rt"
+        elseif topology in ["ring", "rt"]
+            # TODO: This is probably incorrect. My impression was that, in the ring topology,
+            # each monomer can dissociate from at most one monomer. 
             m = min(2, i)
         else
-            # In the ring topology, 
-            error("Topology must be 'fc' or 'rt'")
+            error("Unrecognized topology: $(topology)")
         end
         rates = [rates; [k_on, k_on * C0 * exp(m * delta_G_kb_T)]]
     end
@@ -127,11 +143,15 @@ function get_rate_constants_from_k_ons(k_ons::Vector,
     return rates
 end
 
+"""
+    get_fc_rn(n)
+
+Given integer `n`, return a ReactionSystem object representing a fully connected
+rate growth chemical reaction network. This function is the master organizer of
+this file, calling every function except for `get_rate_constants_from_k_ons()`.
+"""
 function get_fc_rn(n::Int64)::ReactionSystem
-    """
-    Given integer `n`, return a ReactionSystem object representing a fully connected
-    rate growth chemical reaction network.
-    """
+    
     species_list = get_fc_species_list(n)
 
     # Evaluate meta-programmed strings describing the species and reactions involved

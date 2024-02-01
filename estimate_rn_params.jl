@@ -3,19 +3,28 @@ using DifferentialEquations
 using Optimization
 using OptimizationOptimisers
 using ForwardDiff
-using PreallocationTools
-
-# These imports may be unncessary
 using Zygote
 using SciMLSensitivity
 using OptimizationOptimJL
 
 include("construct_rn.jl")
 
+"""
+    log10_range(start, ending[, length])
+
+Like the built-in `range()` function, but returns values that are equidistant in
+log10-space.
+"""
 function log10_range(start, ending, length::Int64=100)::Vector
     return 10 .^ range(log10(start), log10(ending), length=length)
 end
 
+"""
+    sample_rn(rn, topology, k_ons, sample_times[, noise, printer])
+
+Solve the reaction network `rn` parameterized by `topology` and `k_ons` and return 
+a "sample" of its concentrations at times listed in `sample_times`.
+"""
 function sample_rn(rn::ReactionSystem,
                    topology::String,
                    k_ons::Vector,
@@ -23,11 +32,12 @@ function sample_rn(rn::ReactionSystem,
                    noise::Float64=0.,
                    printer::Bool=false)
 
+    # Print output true k_on values. Used to get output from benchmarking in 
+    # benchmark_run_estimates.jl
     if printer
         print("True\t")
         for k_on in k_ons
-            print(k_on)
-            print("\t")
+            print(k_on, "\t")
         end
         println()
     end
@@ -53,7 +63,11 @@ function sample_rn(rn::ReactionSystem,
     return sample_vals, prob
 end
 
-# Custom type used to record the height and horizontal bounds of kinetic traps
+"""
+    kinetic_trap(y, t_start, t_end)
+
+Custom type used to record the y-value and horizontal bounds of a kinetic trap.
+"""
 mutable struct kinetic_trap
     y::Float64
     t_start::Float64
@@ -66,7 +80,9 @@ end
 Given equal-length vectors of times `t` concentrations `u`, return a vector
 of `trap` objects that record the height and horizontal bounds of kinetic traps,
 i.e. regions in which the finite difference of `u` w.r.t. `log10.(t)` is less than
-`threshold=0.05`.
+`threshold=0.05`. Flat reginos of `u` at the beginning and end of the provided data
+will not be counted as traps, as they represent initial and terminal equilibrium,
+not intermediate pseudo-equilibriated states.
 """
 function detect_traps(t::Vector, u::Vector)::Vector{kinetic_trap}
     # Approximate the time derivative as a simple finite difference
@@ -92,6 +108,9 @@ function detect_traps(t::Vector, u::Vector)::Vector{kinetic_trap}
             push!(kinetic_traps, current_trap)
             current_trap = kinetic_trap(0., 0., 0.) # Clean out fields, just to be safe
         end
+
+        # Prevent counting the beginning of a reaction, which will likely be flat
+        # as a trap
         if finite_difference[i] > threshold
             has_exceeded_threshold = true
         end
@@ -104,9 +123,10 @@ function optimise_p(p_init::Vector,
                     topology::String,
                     sample_times::Vector{Float64}, 
                     sample_vals::Array{Float64, 2}, 
-                    prob::ODEProblem,
+                    prob::ODEProblem;
                     autodiff_routine::String="reverse",
-                    experiment_type::String="end_product_yield")::Vector{Float64}
+                    experiment_type::String="end_product_yield",
+                    printer::Bool=true)::Vector{Float64}
     # `topology` should be "fc" for fully connected topology or "rg" for ring topology
 
     if experiment_type == "kinetic_traps"
@@ -116,38 +136,35 @@ function optimise_p(p_init::Vector,
         kinetic_traps = detect_traps(sample_times, sample_vals[end, :])
     end
 
+    # This weird generic typing is necessitated by the explicit use of dual numbers
+    # by forward-mode autodiff, as implemented in `Optimization.AutoForwardDiff()`.
     function loss(p::AbstractVector{T}, _) where T
         params = get_rate_constants_from_k_ons(p, topology)
 
-        params = T[params[1],
-                   params[2],
-                   params[3],
-                   params[4],
-                   params[5],
-                   params[6],
-                   params[7],
-                   params[8]]
-
-        #println("params in loss func: $(params)")
+        # params = T[params[1],
+        #            params[2],
+        #            params[3],
+        #            params[4],
+        #            params[5],
+        #            params[6],
+        #            params[7],
+        #            params[8]]
 
         newprob = remake(prob; 
                          p=params, 
                          tspan=T[sample_times[1], sample_times[end]])
         # TRBDF2 is a stiff solver that is warranted by the log-time-scale of kinetic
-        # kinetic traps, there are situations in which Tsit5 can be used instead
+        # kinetic traps, there are situations in which Tsit5 can be used instead.
         sol = Array(solve(newprob, TRBDF2(); saveat=sample_times, maxiters=1e7))
-
-        # sol_vals = zeros(T, size(sol, 2))
-        # sample_vals = zeros(T, size(sol, 2))
-
-        # for i = 1:size(sol, 2)
-        #     sol_vals[i] = sol[7, i]
-        #     sample_vals[i] = sample_vals[7, i]
-        # end
 
         if experiment_type == "end_product_yield"
             loss = sum((sol[end, :] .- sample_vals[end, :]) .^ 2)
         elseif experiment_type == "kinetic_traps"
+            # Calculate mean-squared error between the theoretical concentration 
+            # trajectory and the concentrations of observed kinetic traps. Importantly,
+            # this loss function does not take into account any information about 
+            # the concentrations of the species at times at which kinetic traps
+            # were not observed.
             loss = 0
             for kt in kinetic_traps
                 idxs = findall(sample_times .>= kt.t_start .&& sample_times .<= kt.t_end)
@@ -162,55 +179,40 @@ function optimise_p(p_init::Vector,
     end
 
     # optimize for the parameters that minimize the loss
-    if autodiff_routine in ["rev", "reverse"]
+    if autodiff_routine in ["r", "rev", "reverse"]
         optf = OptimizationFunction(loss, Optimization.AutoZygote())
-    elseif autodiff_routine in ["for", "forward"]
+    elseif autodiff_routine in ["f", "for", "forward"]
         optf = OptimizationFunction(loss, Optimization.AutoForwardDiff())
     else
         error("Invalid autodiff routine: $(autodiff_routine)")
     end
+
     optprob = OptimizationProblem(optf, p_init)
-    sol = solve(optprob, Adam(10); maxiters = 1000)
+    # The argument passed into `Adam()` is its learning rate.
+    sol = solve(optprob, Adam(10); maxiters=1000)
 
     # Return the parameter estimates
-    print("Est\t")
-    for k_on in sol
-        print(k_on)
-        print("\t")
+    if printer
+        print("Est\t")
+        for k_on in sol
+            print(k_on, "\t")
+        end
+        println()
     end
-    println()
-    
+
     return sol.u
 end
 
-function plot_rn(rn::ReactionSystem,
-                 topology::String,
-                 p::Vector;
-                 plot_type::String="line",
-                 t_span::Tuple=(1e-4, 1e5),
-                 noise::Float64=0.,
-                 num_samples::Int64=100,
-                 linesize::Int64=4)::Tuple{Vector, Array, Plots.Plot}
+"""
+    get_one_index_per_step(rn)
 
-    sample_times, sample_vals, _ = 
-        sample_rn(rn, topology, p, t_span, noise=noise, num_samples=num_samples)
-
-    # TODO: THIS CURRENTLY ONLY WORKS FOR FULLY-CONNECTED HETEROTRIMER (N=3) DUE
-    # TO THE HARDCODED INDEXING
-    if plot_type == "line"
-        pl = plot(log10.(sample_times), sample_vals[1, :], lw=linesize, label="Monomer")
-        plot!(log10.(sample_times), sample_vals[3, :], lw=linesize, label="Dimer")
-        plot!(log10.(sample_times), sample_vals[7, :], lw=linesize, label="Trimer")
-    elseif plot_type == "dot"
-        pl = scatter(log10.(sample_times), sample_vals[1, :], lw=linesize, label="Monomer")
-        scatter!(log10.(sample_times), sample_vals[3, :], lw=linesize, label="Dimer")
-        scatter!(log10.(sample_times), sample_vals[7, :], lw=linesize, label="Trimer")
-    end
-    plot!(xlabel="log10(t)", ylabel="Relative yield")
-
-    return sample_times, sample_vals, pl
-end
-
+Returns a vector of the indices of the first (lexicographically) species at each
+level of assembly (e.g. monomer, dimer, trimer...) in the reaction network `rn`.
+This function is not currently used, but could be used to run an optimization routine
+that observes one species at each level of assembly. The motivation for this is
+that, in the rate growth model, all species at a given level of assembly have the
+same concentration at all times. 
+"""
 function get_one_index_per_step(rn::ReactionSystem)::Vector{Int64}
     species_lens = collect(length.(string.(rn.species)))
     

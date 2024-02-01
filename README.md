@@ -1,6 +1,15 @@
 ## Kinetic trap estimation
 Rotation project of David Bass in Margaret Johnson lab, Nov. 2023--Jan. 2024. Based on work initiated in Jhaveri and Loggia et al.'s in-review preprint.
 
+### Environment setup
+`Project.toml` and `Manifest.toml` should include all relevant information about the environment needed to run Julia code in this repository. However, environment setup can be most easily performed by opening Julia in the command line in your working directory, hitting the `]`, and then inputting the command `add Catalyst DifferentialEquations Plots Zygote SciMLSensitivity Optimization OptimizationOptimisers ForwardDiff` to install all necessary packages. I recommend that you code in [VSCode with the Julia extension](https://code.visualstudio.com/docs/languages/julia).
+
+### Useful resources
+- [Long lecture that provides a tour of `Catalyst.jl`](https://www.youtube.com/watch?v=tVfxT09AtWQ)
+- [Intro tutorial with Catalyst](https://docs.sciml.ai/Catalyst/stable/)
+- [Rate constant estimation from experimental data](https://docs.sciml.ai/Catalyst/stable/catalyst_applications/parameter_estimation/)
+- [Original version of `rotation_talk.pdf` on Google Slides](https://docs.google.com/presentation/d/1-Mb23PiFgSqMkGJpZ9rYqLjJCuRr13WviM6cUggBn4I/edit?usp=sharing)
+
 ### Contributions
 I wrote a Julia framework for constructing ODE models of fully connected rate-growth chemical reaction networks of arbitrary size.
 - Generalizing this framework to have other topologies or to make different sets of assumptions would be non-trivial, but not difficult.
@@ -16,14 +25,11 @@ In my benchmarking routine, for $n \in \{3, 4, 5\}$, I showed that forward-mode 
 
 I created vectorized illustrations of kinetic trapping (toy example of microtubule assembly) and fully connected heterotrimer assembly (see `rotation_talk.pdf`).
 
-### Potential next steps for integrating my work
+### Potential next steps
 - Document my code more thoroughly.
 - Re-implement more of the Kinetic_AssemblyAD repository in Julia in order to benchmark Julia against the PyTorch implementation.
 - Perform more trials of benchmarking, with memory records in addition to timing and accuracy records.
 - Write up more formal statistical analysis of benchmarking results.
-
-### Links
-- [Original version of `rotation_talk.pdf` on Google Slides](https://docs.google.com/presentation/d/1-Mb23PiFgSqMkGJpZ9rYqLjJCuRr13WviM6cUggBn4I/edit?usp=sharing)
 
 ### References (currently just a dump of my Zotero collection)
 Baydin, A. G., Pearlmutter, B. A., Radul, A. A., & Siskind, J. M. (2018). Automatic differentiation in machine learning: A survey (arXiv:1502.05767). arXiv. https://doi.org/10.48550/arXiv.1502.05767
