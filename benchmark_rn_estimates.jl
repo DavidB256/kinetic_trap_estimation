@@ -55,7 +55,7 @@ function optimization_benchmarking_wrapper(n::Int64, ns::Int64, ar::String="reve
     ts = (1e-4, 1e5)
     st = log10_range(ts[1], ts[2], ns)
 
-    b = @benchmarkable optimise_p(p_init, top, st, sv_and_prob[1], sv_and_prob[2], ar, et) setup=
+    b = @benchmarkable optimise_p(p_init, top, st, sv_and_prob[1], sv_and_prob[2], autodiff_routine=ar, experiment_type=et) setup=
         (st=$st; 
          sv_and_prob = $sample_rn($rn, $top, $sample_k_ons($rn, $n), $st, noise=0., printer=true);
          p_init=rand(Float64, ($n-1)) .* 50. .+ 100.; 
