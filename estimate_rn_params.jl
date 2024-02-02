@@ -10,6 +10,11 @@ using OptimizationOptimJL
 include("construct_rn.jl")
 
 """
+This file contains functions for solving, simulating data frame, detecting kinetic
+traps in, and running optimization on reaction networks. Called from `benchmark_run_estimates.jl`.
+"""
+
+"""
     log10_range(start, ending[, length])
 
 Like the built-in `range()` function, but returns values that are equidistant in
@@ -28,7 +33,7 @@ a "sample" of its concentrations at times listed in `sample_times`.
 function sample_rn(rn::ReactionSystem,
                    topology::String,
                    k_ons::Vector,
-                   sample_times::Vector;
+                   sample_times;
                    noise::Float64=0.,
                    printer::Bool=false)
 
@@ -119,6 +124,14 @@ function detect_traps(t::Vector, u::Vector)::Vector{kinetic_trap}
     return kinetic_traps
 end
 
+"""
+    optimise_p(p_init, topology, sample_times, sample_vals, prob[, autodiff_routine, experiment_type, printer])
+
+Run optimization given experimental data.
+`autodiff_routine` should indicate either "reverse" or "forward" autodiff.
+`experiment_type` should indicate either "end_product_yield" or "kinetic_traps"
+as input experimental data.
+"""
 function optimise_p(p_init::Vector, 
                     topology::String,
                     sample_times::Vector{Float64}, 
@@ -140,15 +153,6 @@ function optimise_p(p_init::Vector,
     # by forward-mode autodiff, as implemented in `Optimization.AutoForwardDiff()`.
     function loss(p::AbstractVector{T}, _) where T
         params = get_rate_constants_from_k_ons(p, topology)
-
-        # params = T[params[1],
-        #            params[2],
-        #            params[3],
-        #            params[4],
-        #            params[5],
-        #            params[6],
-        #            params[7],
-        #            params[8]]
 
         newprob = remake(prob; 
                          p=params, 
@@ -191,7 +195,8 @@ function optimise_p(p_init::Vector,
     # The argument passed into `Adam()` is its learning rate.
     sol = solve(optprob, Adam(10); maxiters=1000)
 
-    # Return the parameter estimates
+    # Print estimates to stdout before they get "swallowed up" by the benchmarking
+    # macro.
     if printer
         print("Est\t")
         for k_on in sol

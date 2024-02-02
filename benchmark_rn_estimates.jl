@@ -4,6 +4,11 @@ include("construct_rn.jl")
 include("estimate_rn_params.jl")
 
 """
+This file contains functions for constructing, simulating from, and estimating parameters
+of reaction networks by referencing `construct_rn.jl` and `estimate_rn_params.jl`.
+"""
+
+"""
     sample_k_ons(rn, n[, time_span, topology])
 
 Given a reaction network `rn` and the number of distinct monomers `n` that it contains,
@@ -19,6 +24,8 @@ function sample_k_ons(rn::ReactionSystem,
                       topology="fc")::Vector
     is_trapped = false
 
+    sample_times = log10_range(time_span[1], time_span[2])
+
     rand_k_ons() = rand(Float64, (n-1)) .* 50. .+ 100.
     k_ons = rand_k_ons()
 
@@ -27,8 +34,8 @@ function sample_k_ons(rn::ReactionSystem,
     # kinetic trapping.
     while !is_trapped
         k_ons = rand_k_ons()
-        sample_vals, _ = sample_rn(rn, topology, k_ons, time_span)
-        kinetic_traps = detect_traps(time_span, sample_vals[end, :])
+        sample_vals, _ = sample_rn(rn, topology, k_ons, sample_times)
+        kinetic_traps = detect_traps(sample_times, sample_vals[end, :])
         is_trapped = length(kinetic_traps) > 0
     end
 
@@ -39,8 +46,9 @@ end
     optimization_benchmarking_wrapper(n, ns[, ar, et])
 
 Running this function performs benchmarking, with output printed to stdout.
+
 """
-function optimization_benchmarking_wrapper(n::Int64, ns::Int64; ar::String="reverse", et::String="end_product_yield")
+function optimization_benchmarking_wrapper(n::Int64, ns::Int64, ar::String="reverse", et::String="end_product_yield")
     rn = get_fc_rn(n)
 
     top = "fc"
@@ -59,7 +67,7 @@ function optimization_benchmarking_wrapper(n::Int64, ns::Int64; ar::String="reve
 end
 
 for n in [3, 4, 5]
-    for mode in ["forward", "reverse"]
+    for mode in ["reverse", "forward"]
         println("n\t", n)
         println("mode\t", mode)
         println()
